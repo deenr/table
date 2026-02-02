@@ -1,0 +1,184 @@
+Week 1 Sprint — “Async Data Dashboard with Caching + Cancellation”
+
+Use-case: “I fetch data from an API, handle loading/error states correctly, avoid duplicate requests, cache results, cancel stale requests, and make the UI predictable.”
+
+This is the core frontend skill you’ll use everywhere (Vue job + real products).
+
+⸻
+
+Deliverables (must ship by Sunday)
+
+1) Live app
+	•	async-dashboard.deanreymen.be (or async.deanreymen.be)
+
+2) Blog post
+	•	deanreymen.be/blog/async-dashboard
+	•	Includes: What / Why / How / Trade-offs / What I’d improve
+
+3) Repo (public)
+	•	README with setup + architecture notes
+
+⸻
+
+Stack (locked)
+	•	Vue 3 + Vite + TypeScript
+	•	Pinia optional (prefer not, use composables)
+	•	Tailwind optional, but keep UI clean
+	•	No UI libraries. Keep it simple.
+
+⸻
+
+The App Spec (exact)
+
+You’ll build a single-page app with 3 panels:
+
+Panel A — Search + Filters
+
+Inputs:
+	1.	query text input
+	2.	country select (5 options hardcoded, like PT/ES/FR/TH/ID)
+	3.	sort select: relevance | newest | oldest
+	4.	page with Prev/Next buttons
+
+Rules:
+	•	Any input change triggers a new fetch (with debounced query: 400ms)
+	•	Page change triggers fetch immediately
+	•	URL must reflect state (query params): ?q=&country=&sort=&page=
+	•	On load, app reads query params and loads that state
+
+Panel B — Results List
+
+Shows:
+	•	list of cards (title, description snippet, timestamp)
+	•	skeleton loading UI while fetching
+	•	“No results” empty state
+	•	error state with “Retry” button
+
+Panel C — Request Inspector (debug view)
+
+This is important. It forces understanding.
+Show:
+	•	current request key (string)
+	•	status: idle | loading | success | error
+	•	cache hit? yes/no
+	•	last fetch duration in ms
+	•	“inflight requests” count (0/1)
+	•	last error message
+
+⸻
+
+Data Source (choose ONE)
+
+Option 1 (recommended): Use a mock API you implement inside the app
+	•	Create a mockApi.ts that simulates network:
+	•	await delay(200–900ms)
+	•	sometimes throws error (10% chance)
+	•	returns deterministic results based on inputs
+This is better than relying on external APIs.
+
+You will implement:
+searchItems({ q, country, sort, page, pageSize }): Promise<{ items, total, page, pageSize }>.
+
+⸻
+
+Core Engineering Requirements (non-negotiable)
+
+1) Single “source of truth” state is URL
+	•	App state derives from query params
+	•	Update state → update URL → triggers fetch
+
+2) Request dedupe + caching
+
+You must implement a composable:
+
+useCachedRequest<T>(key: string, fetcher: (signal: AbortSignal) => Promise<T>, ttlMs: number)
+
+It must:
+	•	Cache results by key for 60 seconds
+	•	Return cached result immediately if fresh
+	•	If not fresh, fetch new and update cache
+	•	Avoid duplicate fetches for same key while one is in flight (dedupe)
+
+3) Cancellation (stale request protection)
+	•	When user changes filters rapidly:
+	•	cancel the previous request via AbortController
+	•	only latest request may update UI
+	•	If aborted, it must not set error state
+
+4) Lifecycle usage (must be visible)
+	•	Use onMounted to bootstrap from URL
+	•	Use watch / watchEffect responsibly for fetch triggers
+	•	Use onBeforeUnmount to abort inflight request
+
+5) Clean separation
+	•	UI components do not call fetch directly
+	•	Data fetching happens in a composable
+	•	URL parsing/updating in a composable
+
+⸻
+
+Folder structure (required)
+	•	src/pages/AsyncDashboard.vue
+	•	src/components/SearchFilters.vue
+	•	src/components/ResultsList.vue
+	•	src/components/RequestInspector.vue
+	•	src/composables/useQueryState.ts
+	•	src/composables/useCachedRequest.ts
+	•	src/api/mockApi.ts
+	•	src/types.ts
+
+⸻
+
+Acceptance Checklist (how I’ll “grade” you)
+
+Pass = ✅ all must be true:
+
+Functionality
+	•	URL updates on every change and restores state on refresh
+	•	Debounced query (400ms) works
+	•	Prev/Next changes page and fetches
+	•	Loading/error/empty states are correct
+
+Caching/Dedupe
+	•	Same request repeated within 60s returns instantly and shows “cache hit: yes”
+	•	If you click “Retry” after success, it should not refetch if cache is fresh
+	•	If you change filters back to a previous key within 60s, it uses cache
+
+Cancellation
+	•	If you type quickly, earlier request never overwrites newer result
+	•	Aborted requests don’t show as errors
+
+Code quality
+	•	Composables are reusable and typed
+	•	No giant god-component doing everything
+	•	No copying random patterns without understanding
+
+⸻
+
+Blog Post Outline (required)
+
+Title: “Async Dashboard: caching + cancellation in Vue 3”
+Sections:
+	1.	The real problem (what breaks in real apps)
+	2.	The UX states (loading/error/empty)
+	3.	How I modeled URL as state
+	4.	Cache design (key, TTL, dedupe)
+	5.	Cancellation + race conditions
+	6.	What I’d improve next week
+
+Include:
+	•	deployed link
+	•	screenshot
+	•	one “gotcha” you hit
+
+⸻
+
+Your Day-by-Day plan (minimal)
+
+Mon: scaffold + URL state + UI skeleton
+Tue: mock API + results rendering + states
+Wed: caching + dedupe composable
+Thu: cancellation + request inspector
+Fri: polish + edge cases
+Sat: deploy + custom subdomain
+Sun: blog post + final sweep

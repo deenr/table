@@ -1,0 +1,16 @@
+{
+  "name": "Dean Reymen",
+  "short_name": "Dean Reymen",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "description": "Personal website of Dean Reymen.",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "16x16 32x32 48x48",
+      "type": "image/x-icon"
+    }
+  ]
+}

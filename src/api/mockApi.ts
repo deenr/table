@@ -31,6 +31,8 @@ import { faker } from '@faker-js/faker'
 // })
 
 const cache = new Map<string, ApiResponse<User[]>>()
+const CACHE_TTL_MS = 6000
+const SIMULATED_DELAY_MS = { min: 200, max: 1200 }
 
 export async function getUsers(
   params: UserParams,
@@ -38,138 +40,87 @@ export async function getUsers(
 ): Promise<ApiResponse<User[]>> {
   const { addRequest, updateLatestRequest } = useRequestInspector()
   const requestId = addRequest('users-list')
+  const signal = options?.signal
 
   const start = performance.now()
   let isSettled = false
 
-  const markSettled = () => {
+  const settle = () => {
     isSettled = true
   }
 
-  const throwIfAborted = () => {
-    if (options?.signal?.aborted) {
-      throw createAbortError()
-    }
+  const markSuccess = (cacheHit: boolean) => {
+    if (isSettled) return
+
+    const end = performance.now()
+    updateLatestRequest(requestId, {
+      status: 'success',
+      cacheHit,
+      durationInMs: end - start,
+    })
+    settle()
   }
 
-  const onAbort = () => {
+  const markError = (errorMessage: string) => {
+    if (isSettled) return
+
+    updateLatestRequest(requestId, { status: 'error', errorMessage })
+    settle()
+  }
+
+  const markAborted = () => {
     if (isSettled) return
 
     const end = performance.now()
     updateLatestRequest(requestId, { status: 'aborted', durationInMs: end - start })
-    markSettled()
+    settle()
   }
 
-  if (options?.signal) {
-    options.signal.addEventListener('abort', onAbort, { once: true })
+  const onAbort = () => {
+    markAborted()
   }
+
+  signal?.addEventListener('abort', onAbort, { once: true })
 
   try {
-    throwIfAborted()
+    assertNotAborted(signal)
 
-    const { currentPage, pageSize } = params.pagination
-    const totalPages = Math.ceil(userList.length / pageSize)
-
-    const hasError = Math.random() < 0.1
-    if (hasError) {
-      if (!isSettled) {
-        updateLatestRequest(requestId, {
-          status: 'error',
-          errorMessage: 'INTERNAL_SERVER_ERROR',
-        })
-        markSettled()
-      }
-      return {
-        message: 'Error trying to retrieved successfully',
-        timestamp: new Date().toISOString(),
-        success: false,
-        data: null,
-        pagination: null,
-        error: { message: 'Database connection timeout.', code: 'INTERNAL_SERVER_ERROR' },
-      }
+    if (shouldSimulateError()) {
+      markError('INTERNAL_SERVER_ERROR')
+      return createInternalServerErrorResponse()
     }
 
     const cacheKey = JSON.stringify(params)
-    if (cache.has(cacheKey)) {
-      const cachedResponse = cache.get(cacheKey)
-      if (
-        cachedResponse &&
-        Math.abs(new Date(cachedResponse.timestamp).getTime() - new Date().getTime()) <= 6000
-      ) {
-        if (!isSettled) {
-          const end = performance.now()
-          updateLatestRequest(requestId, {
-            status: 'success',
-            cacheHit: true,
-            durationInMs: end - start,
-          })
-          markSettled()
-        }
-        return cachedResponse
-      }
+    const cachedResponse = getFreshCachedResponse(cacheKey)
+    if (cachedResponse) {
+      markSuccess(true)
+      return cachedResponse
     }
 
-    await waitForDelayOrAbort(options?.signal)
-    throwIfAborted()
+    await waitForDelayOrAbort(signal)
+    assertNotAborted(signal)
 
-    const sortedList = getSortedUserList(userList, params.sort)
-    const filteredList = getFilteredUserList(sortedList, params.filters)
-
-    const newResponse = {
-      message: 'Data retrieved successfully',
-      timestamp: new Date().toISOString(),
-      success: true,
-      data: filteredList.slice(currentPage * pageSize, currentPage * pageSize + pageSize),
-      pagination: {
-        currentPage,
-        pageSize,
-        totalElements: filteredList.length,
-        totalPages: Math.ceil(filteredList.length / pageSize),
-        hasPrevious: currentPage - 1 > 0,
-        hasNext: currentPage - 1 !== totalPages,
-      },
-      error: null,
-    } as ApiResponse<User[]>
-    cache.set(cacheKey, newResponse)
-
-    if (!isSettled) {
-      const end = performance.now()
-      updateLatestRequest(requestId, {
-        status: 'success',
-        cacheHit: false,
-        durationInMs: end - start,
-      })
-      markSettled()
-    }
-    return newResponse
+    const response = createUsersResponse(params)
+    cache.set(cacheKey, response)
+    markSuccess(false)
+    return response
   } catch (error) {
     if (isAbortError(error)) {
-      if (!isSettled) {
-        const end = performance.now()
-        updateLatestRequest(requestId, { status: 'aborted', durationInMs: end - start })
-        markSettled()
-      }
+      markAborted()
       throw error
     }
     throw error
   } finally {
-    if (options?.signal) {
-      options.signal.removeEventListener('abort', onAbort)
-    }
+    signal?.removeEventListener('abort', onAbort)
   }
 }
 
 function waitForDelayOrAbort(signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
-    const minTime = 200
-    const maxTime = 1200
-    const timeout = setTimeout(
-      () => {
-        signal?.removeEventListener('abort', onAbort)
-        resolve()
-      },
-      minTime + Math.random() * (maxTime - minTime),
-    )
+    const timeout = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort)
+      resolve()
+    }, getSimulatedDelayMs())
 
     const onAbort = () => {
       clearTimeout(timeout)
@@ -185,6 +136,65 @@ function waitForDelayOrAbort(signal?: AbortSignal): Promise<void> {
     }
     signal.addEventListener('abort', onAbort, { once: true })
   })
+}
+
+function assertNotAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw createAbortError()
+  }
+}
+
+function shouldSimulateError(): boolean {
+  return Math.random() < 0.1
+}
+
+function getSimulatedDelayMs(): number {
+  return SIMULATED_DELAY_MS.min + Math.random() * (SIMULATED_DELAY_MS.max - SIMULATED_DELAY_MS.min)
+}
+
+function getFreshCachedResponse(cacheKey: string): ApiResponse<User[]> | undefined {
+  const cachedResponse = cache.get(cacheKey)
+  if (!cachedResponse) return undefined
+
+  const ageInMs = Math.abs(new Date(cachedResponse.timestamp).getTime() - Date.now())
+  if (ageInMs > CACHE_TTL_MS) return undefined
+
+  return cachedResponse
+}
+
+function createInternalServerErrorResponse(): ApiResponse<User[]> {
+  return {
+    message: 'Error trying to retrieved successfully',
+    timestamp: new Date().toISOString(),
+    success: false,
+    data: null,
+    pagination: null,
+    error: { message: 'Database connection timeout.', code: 'INTERNAL_SERVER_ERROR' },
+  }
+}
+
+function createUsersResponse(params: UserParams): ApiResponse<User[]> {
+  const { currentPage, pageSize } = params.pagination
+  const sortedList = getSortedUserList(userList, params.sort)
+  const filteredList = getFilteredUserList(sortedList, params.filters)
+  const totalPages = Math.ceil(filteredList.length / pageSize)
+  const startIndex = (currentPage - 1) * pageSize
+
+  return {
+    message: 'Data retrieved successfully',
+    timestamp: new Date().toISOString(),
+    success: true,
+    data: filteredList.slice(startIndex, startIndex + pageSize),
+    pagination: {
+      currentPage,
+      pageSize,
+      totalElements: filteredList.length,
+      totalPages,
+      hasPrevious: currentPage > 1,
+      hasNext: currentPage < totalPages,
+    },
+    error: null,
+  }
 }
 
 function createAbortError(): Error {

@@ -43,11 +43,11 @@
             v-slot="{ page }"
             :items-per-page="pageSize"
             :total="pagination?.totalElements"
-            :default-page="pagination?.currentPage"
+            :page="currentPage"
             :sibling-count="1"
             :show-edges="true"
             class="min-w-0 shrink-0 overflow-hidden"
-            @update:page="setQueryValue('page', $event.toString())"
+            @update:page="setQueryValues({ page: $event.toString() })"
           >
             <PaginationContent v-slot="{ items }" class="w-full min-w-0 border-t border-border p-3">
               <template v-for="(item, index) in items" :key="index">
@@ -122,7 +122,7 @@ import userListJSON from '../../public/users.json'
 import countriesJSON from '../../public/countries.json'
 import RequestInspector from '@/components/RequestInspector.vue'
 
-const { query, setQueryValue, setQueryValues } = useRouteQuery()
+const { query, setQueryValues } = useRouteQuery()
 const { fetch } = useFetch()
 
 const filter: DataFilter = {
@@ -152,6 +152,7 @@ const filter: DataFilter = {
 
 const pageSize = 30
 const pagination = ref<PaginationMetadata>()
+const currentPage = computed(() => Math.max(Number(query.value.page ?? 1) || 1, 1))
 
 const userList = ref<User[]>([])
 const items = computed<(User & { countryFlag: string | undefined })[]>(() =>
@@ -209,7 +210,7 @@ watch(
                   },
                 }
               : {}),
-            pagination: { currentPage: (query.page as unknown as number) ?? 1, pageSize },
+            pagination: { currentPage: currentPage.value, pageSize },
           },
           { signal },
         ),
@@ -217,9 +218,15 @@ watch(
       if (!response) return
 
       if (response.success) {
+        const requestedPage = currentPage.value
+        const totalPages = Math.max(response.pagination?.totalPages ?? 1, 1)
+        if (requestedPage > totalPages) {
+          setQueryValues({ page: '1' })
+          return
+        }
+
         userList.value = response.data
         pagination.value = response.pagination
-        console.log(response.pagination)
       } else {
         userList.value = []
         error.value = response.error

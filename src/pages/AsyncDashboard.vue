@@ -1,5 +1,5 @@
 <template>
-  <div class="h-full min-h-0 flex flex-col gap-4 max-w-5xl mx-auto p-4">
+  <div class="relative h-full min-h-0 flex flex-col gap-4 max-w-5xl mx-auto p-4">
     <DataFilters :filter="filter" />
     <Separator />
     <main class="h-full min-h-0 relative flex flex-col gap-4 flex-1">
@@ -77,6 +77,7 @@
       </section>
     </main>
   </div>
+  <RequestInspector class="absolute right-0 top-0 bottom-0 h-full" />
 </template>
 
 <script setup lang="ts">
@@ -99,6 +100,7 @@ import { useFetch } from '@/composables/useFetch'
 
 import userListJSON from '../../public/users.json'
 import countriesJSON from '../../public/countries.json'
+import RequestInspector from '@/components/RequestInspector.vue'
 
 const { query, setQueryValue } = useRouteQuery()
 const { fetch } = useFetch()

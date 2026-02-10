@@ -13,6 +13,7 @@ export interface UserParams {
   }
 }
 
+import { useRequestInspector } from '@/composables/useRequestInspector'
 import userList from '../../public/users.json'
 
 import { faker } from '@faker-js/faker'
@@ -34,65 +35,164 @@ export async function getUsers(
   params: UserParams,
   options?: { signal: AbortSignal },
 ): Promise<ApiResponse<User[]>> {
+  const { addRequest, updateLatestRequest } = useRequestInspector()
+  const requestId = addRequest('users-list')
+
+  const start = performance.now()
+  let isSettled = false
+
+  const markSettled = () => {
+    isSettled = true
+  }
+
+  const throwIfAborted = () => {
+    if (options?.signal?.aborted) {
+      throw createAbortError()
+    }
+  }
+
+  const onAbort = () => {
+    if (isSettled) return
+
+    const end = performance.now()
+    updateLatestRequest(requestId, { status: 'aborted', durationInMs: end - start })
+    markSettled()
+  }
+
   if (options?.signal) {
-    options.signal.addEventListener('abort', () => {
-      throw new Error('Aborted')
-    })
+    options.signal.addEventListener('abort', onAbort, { once: true })
   }
 
-  const { currentPage, pageSize } = params.pagination
-  const totalPages = Math.ceil(userList.length / pageSize)
+  try {
+    throwIfAborted()
 
-  const hasError = Math.random() < 0.1
-  if (hasError) {
-    return {
-      message: hasError ? 'Error trying to retrieved successfully' : 'Data retrieved successfully',
+    const { currentPage, pageSize } = params.pagination
+    const totalPages = Math.ceil(userList.length / pageSize)
+
+    const hasError = Math.random() < 0.1
+    if (hasError) {
+      if (!isSettled) {
+        updateLatestRequest(requestId, {
+          status: 'error',
+          errorMessage: 'INTERNAL_SERVER_ERROR',
+        })
+        markSettled()
+      }
+      return {
+        message: 'Error trying to retrieved successfully',
+        timestamp: new Date().toISOString(),
+        success: false,
+        data: null,
+        pagination: null,
+        error: { message: 'Database connection timeout.', code: 'INTERNAL_SERVER_ERROR' },
+      }
+    }
+
+    const cacheKey = JSON.stringify(params)
+    if (cache.has(cacheKey)) {
+      const cachedResponse = cache.get(cacheKey)
+      if (
+        cachedResponse &&
+        Math.abs(new Date(cachedResponse.timestamp).getTime() - new Date().getTime()) <= 6000
+      ) {
+        if (!isSettled) {
+          const end = performance.now()
+          updateLatestRequest(requestId, {
+            status: 'success',
+            cacheHit: true,
+            durationInMs: end - start,
+          })
+          markSettled()
+        }
+        return cachedResponse
+      }
+    }
+
+    await waitForDelayOrAbort(options?.signal)
+    throwIfAborted()
+
+    const filteredList = getFilteredUserList(userList, params.filters)
+
+    const newResponse = {
+      message: 'Data retrieved successfully',
       timestamp: new Date().toISOString(),
-      success: false,
-      data: null,
-      pagination: null,
-      error: { message: 'Database connection timeout.', code: 'INTERNAL_SERVER_ERROR' },
+      success: true,
+      data: filteredList.slice(currentPage * pageSize, currentPage * pageSize + pageSize),
+      pagination: {
+        currentPage,
+        pageSize,
+        totalElements: filteredList.length,
+        totalPages: Math.ceil(filteredList.length / pageSize),
+        hasPrevious: currentPage - 1 > 0,
+        hasNext: currentPage - 1 !== totalPages,
+      },
+      error: null,
+    } as ApiResponse<User[]>
+    cache.set(cacheKey, newResponse)
+
+    if (!isSettled) {
+      const end = performance.now()
+      updateLatestRequest(requestId, {
+        status: 'success',
+        cacheHit: false,
+        durationInMs: end - start,
+      })
+      markSettled()
+    }
+    return newResponse
+  } catch (error) {
+    if (isAbortError(error)) {
+      if (!isSettled) {
+        const end = performance.now()
+        updateLatestRequest(requestId, { status: 'aborted', durationInMs: end - start })
+        markSettled()
+      }
+      throw error
+    }
+    throw error
+  } finally {
+    if (options?.signal) {
+      options.signal.removeEventListener('abort', onAbort)
     }
   }
+}
 
-  const cacheKey = JSON.stringify(params)
-  if (cache.has(cacheKey)) {
-    const cachedResponse = cache.get(cacheKey)
-    if (
-      cachedResponse &&
-      Math.abs(new Date(cachedResponse.timestamp).getTime() - new Date().getTime()) <= 6000
-    ) {
-      return cachedResponse
-    }
-  }
-
-  await new Promise((resolve) => {
+function waitForDelayOrAbort(signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
     const minTime = 200
     const maxTime = 1200
+    const timeout = setTimeout(
+      () => {
+        signal?.removeEventListener('abort', onAbort)
+        resolve()
+      },
+      minTime + Math.random() * (maxTime - minTime),
+    )
 
-    setTimeout(resolve, minTime + Math.random() * (maxTime - minTime))
+    const onAbort = () => {
+      clearTimeout(timeout)
+      signal?.removeEventListener('abort', onAbort)
+      reject(createAbortError())
+    }
+
+    if (!signal) return
+    if (signal.aborted) {
+      clearTimeout(timeout)
+      reject(createAbortError())
+      return
+    }
+    signal.addEventListener('abort', onAbort, { once: true })
   })
+}
 
-  const filteredList = getFilteredUserList(userList, params.filters)
+function createAbortError(): Error {
+  const error = new Error('Aborted')
+  error.name = 'AbortError'
+  return error
+}
 
-  const newResponse = {
-    message: 'Data retrieved successfully',
-    timestamp: new Date().toISOString(),
-    success: true,
-    data: filteredList.slice(currentPage * pageSize, currentPage * pageSize + pageSize),
-    pagination: {
-      currentPage,
-      pageSize,
-      totalElements: filteredList.length,
-      totalPages: Math.ceil(filteredList.length / pageSize),
-      hasPrevious: currentPage - 1 > 0,
-      hasNext: currentPage - 1 !== totalPages,
-    },
-    error: null,
-  } as ApiResponse<User[]>
-  cache.set(cacheKey, newResponse)
-
-  return newResponse
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === 'AbortError'
 }
 
 function getFilteredUserList(list: User[], filters: UserParams['filters']): User[] {

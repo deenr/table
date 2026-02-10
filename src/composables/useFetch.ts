@@ -11,8 +11,6 @@ export function useFetch() {
     controllerMap.set(key, controller)
     const signal = controller.signal
 
-    console.log('hi')
-
     return await fn(signal)
   }
 

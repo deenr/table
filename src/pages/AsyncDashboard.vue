@@ -33,7 +33,6 @@
                 label: 'Sex',
                 badge: true,
                 skeletonWidth: 'w-[48px]',
-                formatter: (value) => (value === 'male' ? 'Male' : 'Female'),
               },
             ]"
             :items="items"

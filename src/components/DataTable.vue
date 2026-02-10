@@ -29,10 +29,10 @@
                   class="size-3"
                   :src="item[column.badge.imageKey]"
                 />
-                {{ item.formatter ? item.formatter(item[column.key]) : item[column.key] }}
+                {{ column.formatter ? column.formatter(item[column.key]) : item[column.key] }}
               </Badge>
               <template v-else>
-                {{ item.formatter ? item.formatter(item[column.key]) : item[column.key] }}
+                {{ column.formatter ? column.formatter(item[column.key]) : item[column.key] }}
               </template>
             </TableCell>
           </TableRow>

@@ -1,19 +1,22 @@
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 export function useRouteQuery() {
   const route = useRoute()
   const router = useRouter()
 
+  const query = computed(() => route.query)
+
   function setQueryValue(key: string, value: string | null): void {
     const newQuery = {
-      ...route.query,
+      ...query.value,
     }
     if (value) {
-      newQuery[key] = value
+      newQuery[key] = query.value[key] === value ? [] : value
     } else {
       delete newQuery[key]
     }
-    router.push({
+    router.replace({
       ...route,
       query: newQuery,
     })
@@ -21,10 +24,10 @@ export function useRouteQuery() {
 
   function setQueryArray(key: string, value: string | null): void {
     const newQuery = {
-      ...route.query,
+      ...query.value,
     }
 
-    let currentArray = route.query[key] as string[] | undefined
+    let currentArray = query.value[key] as string[] | undefined
     if (!currentArray) {
       currentArray = []
     }
@@ -36,11 +39,13 @@ export function useRouteQuery() {
       newQuery[key] = currentArray
     }
 
-    router.push({
+    console.log(currentArray)
+
+    router.replace({
       ...route,
       query: newQuery,
     })
   }
 
-  return { setQueryValue, setQueryArray }
+  return { query, setQueryValue, setQueryArray }
 }

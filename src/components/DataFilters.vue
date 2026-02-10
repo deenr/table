@@ -1,12 +1,16 @@
 <template>
   <header class="flex align-center justify-between">
-    <InputGroup class="w-xs">
-      <InputGroupInput placeholder="Search..." v-model="nameFilter" />
+    <InputGroup v-if="props.filter.search" class="w-xs">
+      <InputGroupInput
+        :placeholder="props.filter.search.placeholder"
+        :value="query[props.filter.search.key]"
+        @update:modelValue="setQueryValue(props.filter.search.key, $event)"
+      />
       <InputGroupAddon>
         <Search />
       </InputGroupAddon>
     </InputGroup>
-    <DropdownMenu>
+    <DropdownMenu v-if="props.filter">
       <DropdownMenuTrigger as-child>
         <Button variant="outline">
           <Filter />
@@ -14,12 +18,32 @@
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent class="w-56" align="start">
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger>Sex</DropdownMenuSubTrigger>
+        <DropdownMenuSub
+          v-for="filter in props.filter.filters"
+          :key="filter.key"
+          class="max-h-screen overflow-y-scroll"
+        >
+          <DropdownMenuSubTrigger>{{ filter.label }}</DropdownMenuSubTrigger>
           <DropdownMenuPortal>
             <DropdownMenuSubContent>
-              <DropdownMenuItem @click="setQueryArray('sex', 'male')"> Male </DropdownMenuItem>
-              <DropdownMenuItem @click="setQueryArray('sex', 'female')"> Female </DropdownMenuItem>
+              <DropdownMenuItem
+                v-for="option in filter.options"
+                :key="`${filter.key}_${option.id}`"
+                @click="
+                  filter.multiple
+                    ? setQueryArray(filter.key, option.id)
+                    : setQueryValue(filter.key, option.id)
+                "
+              >
+                {{ option.label }}
+                <Check
+                  v-if="
+                    filter.multiple
+                      ? query[filter.key]?.includes(option.id)
+                      : query[filter.key] === option.id
+                  "
+                />
+              </DropdownMenuItem>
             </DropdownMenuSubContent>
           </DropdownMenuPortal>
         </DropdownMenuSub>
@@ -29,7 +53,7 @@
 </template>
 
 <script setup lang="ts">
-import { Filter, Search } from 'lucide-vue-next'
+import { Check, Filter, Search } from 'lucide-vue-next'
 import { InputGroup, InputGroupInput, InputGroupAddon } from '@/components/ui/input-group'
 import { Button } from '@/components/ui/button'
 import {
@@ -42,14 +66,26 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { ref, watch } from 'vue'
 import { useRouteQuery } from '@/composables/useRouteQuery'
 
-const { setQueryValue, setQueryArray } = useRouteQuery()
+export interface DataFilter {
+  search?: {
+    key: string
+    placeholder?: string
+  }
+  filters?: {
+    key: string
+    label: string
+    options: { id: string; label: string }[]
+    multiple?: boolean
+  }[]
+}
 
-const nameFilter = ref<string | null>(null)
+const { query, setQueryValue, setQueryArray } = useRouteQuery()
 
-watch(nameFilter, (value) => setQueryValue('name', value))
+const props = defineProps<{
+  filter: DataFilter
+}>()
 </script>
 
 <style scoped></style>

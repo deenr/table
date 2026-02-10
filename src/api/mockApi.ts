@@ -1,71 +1,116 @@
 export interface User {
   id: string
   name: string
-  job_title: string
+  countryCode: string
   sex: string
 }
 
 export interface UserParams {
-  filters?: { name?: string; job_title?: string[]; sex?: string[] }
+  filters?: { name?: string; country?: string[]; sex?: string[] }
   pagination: {
     currentPage: number
     pageSize: number
   }
 }
 
+import userList from '../../public/users.json'
+
 import { faker } from '@faker-js/faker'
 
-const userList: User[] = Array.from({ length: 10000 }).map(() => {
-  const sex = faker.person.sexType()
+// const userList: User[] = Array.from({ length: 10000 }).map(() => {
+//   const sex = faker.person.sexType()
 
-  return {
-    id: faker.string.uuid(),
-    name: faker.person.fullName({ sex }),
-    job_title: faker.person.jobTitle(),
-    sex,
+//   return {
+//     id: faker.string.uuid(),
+//     name: faker.person.fullName({ sex }),
+//     countryCode: faker.location.countryCode(),
+//     sex,
+//   }
+// })
+
+const cache = new Map<string, ApiResponse<User[]>>()
+
+export async function getUsers(
+  params: UserParams,
+  options?: { signal: AbortSignal },
+): Promise<ApiResponse<User[]>> {
+  if (options?.signal) {
+    options.signal.addEventListener('abort', () => {
+      throw new Error('Aborted')
+    })
   }
-})
 
-export async function getUsers(params: UserParams): Promise<ApiResponse<User[]>> {
   const { currentPage, pageSize } = params.pagination
   const totalPages = Math.ceil(userList.length / pageSize)
-  return {
+
+  const hasError = Math.random() < 0.1
+  if (hasError) {
+    return {
+      message: hasError ? 'Error trying to retrieved successfully' : 'Data retrieved successfully',
+      timestamp: new Date().toISOString(),
+      success: false,
+      data: null,
+      pagination: null,
+      error: { message: 'Database connection timeout.', code: 'INTERNAL_SERVER_ERROR' },
+    }
+  }
+
+  const cacheKey = JSON.stringify(params)
+  if (cache.has(cacheKey)) {
+    const cachedResponse = cache.get(cacheKey)
+    if (
+      cachedResponse &&
+      Math.abs(new Date(cachedResponse.timestamp).getTime() - new Date().getTime()) <= 6000
+    ) {
+      return cachedResponse
+    }
+  }
+
+  await new Promise((resolve) => {
+    const minTime = 200
+    const maxTime = 1200
+
+    setTimeout(resolve, minTime + Math.random() * (maxTime - minTime))
+  })
+
+  const filteredList = getFilteredUserList(userList, params.filters)
+
+  const newResponse = {
     message: 'Data retrieved successfully',
     timestamp: new Date().toISOString(),
     success: true,
-    data: getFilteredUserList(userList, params.filters).slice(
-      currentPage * pageSize,
-      currentPage * pageSize + pageSize,
-    ),
+    data: filteredList.slice(currentPage * pageSize, currentPage * pageSize + pageSize),
     pagination: {
       currentPage,
       pageSize,
-      totalElements: userList.length,
-      totalPages: Math.ceil(userList.length / pageSize),
+      totalElements: filteredList.length,
+      totalPages: Math.ceil(filteredList.length / pageSize),
       hasPrevious: currentPage - 1 > 0,
       hasNext: currentPage - 1 !== totalPages,
     },
-    errors: null,
-  }
+    error: null,
+  } as ApiResponse<User[]>
+  cache.set(cacheKey, newResponse)
+
+  return newResponse
 }
 
 function getFilteredUserList(list: User[], filters: UserParams['filters']): User[] {
   if (!filters) return list
 
   return list.filter((user) => {
-    let isUserIncluded = true
-    if (filters.name && !user.name.toLowerCase().includes(filters.name.toLowerCase())) {
-      isUserIncluded = false
+    const isUserIncluded = true
+
+    if (filters.name) {
+      const searchTerm = filters.name.toLowerCase()
+      const userName = user.name?.toLowerCase() ?? ''
+      if (!userName.includes(searchTerm)) return false
     }
-    if (
-      filters.job_title &&
-      filters.job_title.length > 0 &&
-      !filters.job_title.includes(user.job_title)
-    ) {
-      isUserIncluded = false
+    if (filters.country?.length && !filters.country.includes(user.countryCode)) {
+      return false
     }
-    if (filters.sex && filters.sex.length > 0 && !filters.sex.includes(user.sex)) {
-      isUserIncluded = false
+    if (filters.sex?.length && !filters.sex.includes(user.sex)) {
+      return false
     }
 
     return isUserIncluded
@@ -109,11 +154,11 @@ export type ApiResponse<T> =
       success: true
       data: T
       pagination?: PaginationMetadata
-      errors: null
+      error: null
     })
   | (BaseResponse & {
       success: false
       data: null
       pagination: null
-      errors: ApiError[]
+      error: ApiError
     })

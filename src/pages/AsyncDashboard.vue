@@ -20,10 +20,11 @@
             class="min-h-0 min-w-0 flex-1"
             :loading="loading"
             :columns="[
-              { key: 'name', label: 'Name', skeletonWidth: 'w-[100px]' },
+              { key: 'name', label: 'Name', sortable: true, skeletonWidth: 'w-[100px]' },
               {
                 key: 'countryCode',
                 label: 'Country',
+                sortable: true,
                 badge: { imageKey: 'countryFlag' },
                 skeletonWidth: 'w-[100px]',
                 formatter: (value) => getCountryNameByCode(value),
@@ -36,6 +37,7 @@
               },
             ]"
             :items="items"
+            @sort-change="onSortChange"
           />
           <Pagination
             v-slot="{ page }"
@@ -120,7 +122,7 @@ import userListJSON from '../../public/users.json'
 import countriesJSON from '../../public/countries.json'
 import RequestInspector from '@/components/RequestInspector.vue'
 
-const { query, setQueryValue } = useRouteQuery()
+const { query, setQueryValue, setQueryValues } = useRouteQuery()
 const { fetch } = useFetch()
 
 const filter: DataFilter = {
@@ -174,6 +176,20 @@ const loading = ref(false)
 const error = ref<ApiError | null>(null)
 const retryCount = ref(0)
 
+function onSortChange(sort: { key: string; direction: 'asc' | 'desc' } | null): void {
+  if (sort) {
+    setQueryValues({
+      sort: sort.key,
+      order: sort.direction,
+    })
+  } else {
+    setQueryValues({
+      sort: null,
+      order: null,
+    })
+  }
+}
+
 watch(
   [query, retryCount],
   async ([query]) => {
@@ -185,11 +201,21 @@ watch(
         getUsers(
           {
             filters: { ...query },
+            ...('sort' in query
+              ? {
+                  sort: {
+                    key: query.sort as string,
+                    order: query.order as string,
+                  },
+                }
+              : {}),
             pagination: { currentPage: (query.page as unknown as number) ?? 1, pageSize },
           },
           { signal },
         ),
       )
+      if (!response) return
+
       if (response.success) {
         userList.value = response.data
         pagination.value = response.pagination

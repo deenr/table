@@ -22,6 +22,25 @@ export function useRouteQuery() {
     })
   }
 
+  function setQueryValues(values: Record<string, string | null>): void {
+    const newQuery = {
+      ...query.value,
+    }
+
+    for (const [key, value] of Object.entries(values)) {
+      if (value) {
+        newQuery[key] = value
+      } else {
+        delete newQuery[key]
+      }
+    }
+
+    router.replace({
+      ...route,
+      query: newQuery,
+    })
+  }
+
   function setQueryArray(key: string, value: string | null): void {
     const newQuery = {
       ...query.value,
@@ -47,5 +66,16 @@ export function useRouteQuery() {
     })
   }
 
-  return { query, setQueryValue, setQueryArray }
+  function removeQueryByKey(key: string): void {
+    const newQuery = {
+      ...query.value,
+    }
+    delete newQuery[key]
+    router.replace({
+      ...route,
+      query: newQuery,
+    })
+  }
+
+  return { query, setQueryValue, setQueryValues, setQueryArray, removeQueryByKey }
 }

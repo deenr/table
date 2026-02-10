@@ -7,6 +7,7 @@ export interface User {
 
 export interface UserParams {
   filters?: { name?: string; country?: string[]; sex?: string[] }
+  sort?: { key: string; order: string }
   pagination: {
     currentPage: number
     pageSize: number
@@ -111,7 +112,8 @@ export async function getUsers(
     await waitForDelayOrAbort(options?.signal)
     throwIfAborted()
 
-    const filteredList = getFilteredUserList(userList, params.filters)
+    const sortedList = getSortedUserList(userList, params.sort)
+    const filteredList = getFilteredUserList(sortedList, params.filters)
 
     const newResponse = {
       message: 'Data retrieved successfully',
@@ -214,6 +216,19 @@ function getFilteredUserList(list: User[], filters: UserParams['filters']): User
     }
 
     return isUserIncluded
+  })
+}
+
+function getSortedUserList(list: User[], sort: UserParams['sort']): User[] {
+  if (!sort) return list
+
+  const sortKey = sort.key as keyof User
+  const sortOrder = sort.order as 'asc' | 'desc'
+  const isAscending = sortOrder === 'asc'
+
+  return [...list].sort((a, b) => {
+    const comparison = a[sortKey].localeCompare(b[sortKey])
+    return isAscending ? comparison : comparison * -1
   })
 }
 

@@ -131,10 +131,6 @@
       'Liberation Mono',
       'Courier New',
       monospace;
-    background-image:
-      linear-gradient(to bottom, oklch(0 0 0 / 0.015) 1px, transparent 1px),
-      linear-gradient(to right, oklch(0 0 0 / 0.015) 1px, transparent 1px);
-    background-size: 28px 28px;
   }
 
   #app {

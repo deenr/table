@@ -15,7 +15,12 @@ const delegatedProps = reactiveOmit(props, "class")
     v-slot="slotProps"
     data-slot="pagination-content"
     v-bind="delegatedProps"
-    :class="cn('flex flex-row items-center gap-1', props.class)"
+    :class="
+      cn(
+        'm-0 flex w-full min-w-0 list-none flex-row items-center gap-1 overflow-x-auto p-0 whitespace-nowrap',
+        props.class,
+      )
+    "
   >
     <slot v-bind="slotProps" />
   </PaginationList>

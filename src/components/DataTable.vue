@@ -1,7 +1,7 @@
 <template>
-  <div class="overflow-y-auto">
+  <div class="overflow-y-auto bg-background">
     <Table>
-      <TableHeader class="bg-background sticky top-0">
+      <TableHeader class="bg-white sticky top-0 z-10 border-b border-border">
         <TableRow>
           <TableHead v-for="column in props.columns" :key="column.key">{{
             column.label

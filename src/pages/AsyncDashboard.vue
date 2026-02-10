@@ -1,88 +1,107 @@
 <template>
-  <div class="relative h-full min-h-0 flex flex-col gap-4 max-w-5xl mx-auto p-4">
-    <DataFilters :filter="filter" />
-    <Separator />
-    <main class="h-full min-h-0 relative flex flex-col gap-4 flex-1">
-      <DataTable
-        class="h-full min-h-0"
-        :loading="loading"
-        :columns="[
-          { key: 'name', label: 'Name', skeletonWidth: 'w-[100px]' },
-          {
-            key: 'countryCode',
-            label: 'Country',
-            badge: { imageKey: 'countryFlag' },
-            skeletonWidth: 'w-[100px]',
-            formatter: (value) => getCountryNameByCode(value),
-          },
-          {
-            key: 'sex',
-            label: 'Sex',
-            badge: true,
-            skeletonWidth: 'w-[48px]',
-            formatter: (value) => (value === 'male' ? 'Male' : 'Female'),
-          },
-        ]"
-        :items="items"
-      />
-      <Pagination
-        v-slot="{ page }"
-        :items-per-page="pageSize"
-        :total="pagination?.totalElements"
-        :default-page="pagination?.currentPage"
-        @update:page="setQueryValue('page', $event.toString())"
-      >
-        <PaginationContent v-slot="{ items }" class="w-full">
-          <template v-for="(item, index) in items" :key="index">
-            <PaginationItem
-              v-if="item.type === 'page'"
-              :value="item.value"
-              :is-active="item.value === page"
-            >
-              {{ item.value }}
-            </PaginationItem>
-          </template>
-          <PaginationPrevious class="ml-auto" />
-          <PaginationNext />
-        </PaginationContent>
-      </Pagination>
+  <div class="mx-auto flex h-dvh w-full max-w-[1320px] flex-col overflow-hidden p-4 md:p-6">
+    <header class="mb-4 border border-border bg-card px-4 py-3">
+      <p class="text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+        Async Data Inspector
+      </p>
+      <h1 class="mt-2 text-xl font-semibold uppercase tracking-[0.16em]">Users List Requests</h1>
+    </header>
+    <div
+      class="grid min-h-0 flex-1 grid-cols-1 border border-border bg-card md:grid-cols-[minmax(0,1fr)_320px]"
+    >
       <section
-        v-if="error"
-        class="absolute inset-0 z-50 flex items-center justify-center bg-background/60"
+        class="relative flex min-h-0 min-w-0 flex-col border-b border-border md:border-r md:border-b-0"
       >
-        <div
-          class="flex flex-col items-center text-center p-8 border rounded-xl bg-card shadow-lg animate-in fade-in zoom-in duration-200"
-        >
-          <div
-            class="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 mb-4"
-          >
-            <AlertCircle class="h-6 w-6 text-destructive" />
-          </div>
-
-          <h3 class="text-lg font-semibold tracking-tight">
-            {{ error.code }}
-          </h3>
-          <h3 class="text-lg font-semibold tracking-tight">
-            {{ error.field }}
-          </h3>
-          <p class="mt-2 text-sm text-muted-foreground leading-relaxed">
-            {{ error.message }}
-          </p>
-
-          <Button variant="outline" size="sm" class="mt-6" @click="() => retryCount++">
-            <RotateCcw class="h-4 w-4" />
-            Try again
-          </Button>
+        <div class="flex h-20 items-center border-b border-border px-4">
+          <DataFilters :filter="filter" />
         </div>
+        <main class="relative flex min-h-0 min-w-0 flex-1 flex-col">
+          <DataTable
+            class="min-h-0 min-w-0 flex-1"
+            :loading="loading"
+            :columns="[
+              { key: 'name', label: 'Name', skeletonWidth: 'w-[100px]' },
+              {
+                key: 'countryCode',
+                label: 'Country',
+                badge: { imageKey: 'countryFlag' },
+                skeletonWidth: 'w-[100px]',
+                formatter: (value) => getCountryNameByCode(value),
+              },
+              {
+                key: 'sex',
+                label: 'Sex',
+                badge: true,
+                skeletonWidth: 'w-[48px]',
+                formatter: (value) => (value === 'male' ? 'Male' : 'Female'),
+              },
+            ]"
+            :items="items"
+          />
+          <Pagination
+            v-slot="{ page }"
+            :items-per-page="pageSize"
+            :total="pagination?.totalElements"
+            :default-page="pagination?.currentPage"
+            :sibling-count="1"
+            :show-edges="true"
+            class="min-w-0 shrink-0 overflow-hidden"
+            @update:page="setQueryValue('page', $event.toString())"
+          >
+            <PaginationContent v-slot="{ items }" class="w-full min-w-0 border-t border-border p-3">
+              <template v-for="(item, index) in items" :key="index">
+                <PaginationItem
+                  v-if="item.type === 'page'"
+                  :value="item.value"
+                  :is-active="item.value === page"
+                  size="icon-sm"
+                >
+                  {{ item.value }}
+                </PaginationItem>
+              </template>
+              <PaginationPrevious size="sm" class="ml-auto" />
+              <PaginationNext size="sm" />
+            </PaginationContent>
+          </Pagination>
+          <section
+            v-if="error"
+            class="absolute inset-0 z-50 flex items-center justify-center bg-background/80 p-4"
+          >
+            <div
+              class="animate-in fade-in zoom-in duration-200 border border-border bg-card p-8 text-center"
+            >
+              <div
+                class="mx-auto mb-4 flex h-10 w-10 items-center justify-center border border-border"
+              >
+                <AlertCircle class="h-5 w-5 text-foreground" />
+              </div>
+              <h3 class="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                Request Failed
+              </h3>
+              <h3 class="mt-2 text-base font-semibold uppercase tracking-[0.08em]">
+                {{ error.code }}
+              </h3>
+              <h3 v-if="error.field" class="text-sm font-medium uppercase tracking-[0.08em]">
+                {{ error.field }}
+              </h3>
+              <p class="mt-2 text-sm text-muted-foreground leading-relaxed">
+                {{ error.message }}
+              </p>
+              <Button variant="outline" size="sm" class="mt-6" @click="() => retryCount++">
+                <RotateCcw class="h-4 w-4" />
+                Try again
+              </Button>
+            </div>
+          </section>
+        </main>
       </section>
-    </main>
+      <RequestInspector class="h-full min-h-[260px] md:min-h-0" />
+    </div>
   </div>
-  <RequestInspector class="absolute right-0 top-0 bottom-0 h-full" />
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { Separator } from '@/components/ui/separator'
 import DataTable from '@/components/DataTable.vue'
 import DataFilters, { type DataFilter } from '@/components/DataFilters.vue'
 import {

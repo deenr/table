@@ -1,31 +1,27 @@
 <template>
-  <header class="flex align-center justify-between">
-    <InputGroup v-if="props.filter.search" class="w-xs">
+  <header class="flex gap-3 flex-row items-center justify-between">
+    <InputGroup v-if="props.filter.search" class="w-full">
       <InputGroupInput
         :placeholder="props.filter.search.placeholder"
         :value="query[props.filter.search.key]"
         @update:modelValue="setQueryValue(props.filter.search.key, $event)"
       />
       <InputGroupAddon>
-        <Search />
+        <Search class="size-4 text-muted-foreground" />
       </InputGroupAddon>
     </InputGroup>
     <DropdownMenu v-if="props.filter">
       <DropdownMenuTrigger as-child>
         <Button variant="outline">
-          <Filter />
+          <Filter class="size-4" />
           Filter
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent class="w-56" align="start">
-        <DropdownMenuSub
-          v-for="filter in props.filter.filters"
-          :key="filter.key"
-          class="max-h-screen overflow-y-scroll"
-        >
+      <DropdownMenuContent class="w-64" align="start">
+        <DropdownMenuSub v-for="filter in props.filter.filters" :key="filter.key">
           <DropdownMenuSubTrigger>{{ filter.label }}</DropdownMenuSubTrigger>
           <DropdownMenuPortal>
-            <DropdownMenuSubContent>
+            <DropdownMenuSubContent class="max-h-72 overflow-y-auto">
               <DropdownMenuItem
                 v-for="option in filter.options"
                 :key="`${filter.key}_${option.id}`"

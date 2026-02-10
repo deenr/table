@@ -15,13 +15,11 @@
       </DropdownMenuTrigger>
       <DropdownMenuContent class="w-56" align="start">
         <DropdownMenuSub>
-          <DropdownMenuSubTrigger>Jobs</DropdownMenuSubTrigger>
+          <DropdownMenuSubTrigger>Sex</DropdownMenuSubTrigger>
           <DropdownMenuPortal>
             <DropdownMenuSubContent>
-              <DropdownMenuItem @click="setQueryArray('job', 'Software Engineer')">
-                Software Engineer
-              </DropdownMenuItem>
-              <DropdownMenuItem @click="setQueryArray('job', 'Nurse')"> Nurse </DropdownMenuItem>
+              <DropdownMenuItem @click="setQueryArray('sex', 'male')"> Male </DropdownMenuItem>
+              <DropdownMenuItem @click="setQueryArray('sex', 'female')"> Female </DropdownMenuItem>
             </DropdownMenuSubContent>
           </DropdownMenuPortal>
         </DropdownMenuSub>

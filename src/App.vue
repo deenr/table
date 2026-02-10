@@ -1,11 +1,24 @@
-<script setup lang="ts"></script>
+<script setup lang="ts">
+import { ref, computed, type Component } from 'vue'
+import AsyncDashboard from '@/pages/AsyncDashboard.vue'
+
+const routes: Record<string, Component> = {
+  '/': AsyncDashboard,
+}
+
+const currentPath = ref(window.location.hash)
+
+window.addEventListener('hashchange', () => {
+  currentPath.value = window.location.hash
+})
+
+const currentView = computed(() => {
+  return routes[currentPath.value.slice(1) || '/'] || AsyncDashboard
+})
+</script>
 
 <template>
-  <h1>You did it!</h1>
-  <p>
-    Visit <a href="https://vuejs.org/" target="_blank" rel="noopener">vuejs.org</a> to read the
-    documentation
-  </p>
+  <component :is="currentView" />
 </template>
 
 <style scoped></style>

@@ -19,6 +19,7 @@
           <DataTable
             class="min-h-0 min-w-0 flex-1"
             :loading="loading"
+            :sort="currentSort"
             :columns="[
               { key: 'name', label: 'Name', sortable: true, skeletonWidth: 'w-[100px]' },
               {
@@ -134,10 +135,12 @@ const filter: DataFilter = {
     {
       key: 'country',
       label: 'Country',
-      options: [...new Set(userListJSON.map((u) => u.countryCode))].map((c) => ({
-        id: c,
-        label: getCountryNameByCode(c)!,
-      })),
+      options: [...new Set(userListJSON.map((u) => u.countryCode))]
+        .map((countryCode) => ({
+          id: countryCode,
+          label: getCountryNameByCode(countryCode) ?? countryCode,
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
     },
     {
       key: 'sex',
@@ -153,6 +156,19 @@ const filter: DataFilter = {
 const pageSize = 30
 const pagination = ref<PaginationMetadata>()
 const currentPage = computed(() => Math.max(Number(query.value.page ?? 1) || 1, 1))
+const currentSort = computed<{ key: string; direction: 'asc' | 'desc' } | null>(() => {
+  const key = query.value.sort
+  const direction = query.value.order
+
+  if (
+    typeof key === 'string' &&
+    (direction === 'asc' || direction === 'desc')
+  ) {
+    return { key, direction }
+  }
+
+  return null
+})
 
 const userList = ref<User[]>([])
 const items = computed<(User & { countryFlag: string | undefined })[]>(() =>

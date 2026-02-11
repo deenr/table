@@ -68,7 +68,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ArrowDown, ArrowUp } from 'lucide-vue-next'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 
 type DataColumn = {
   key: string
@@ -83,6 +83,7 @@ const props = defineProps<{
   loading?: boolean
   columns: DataColumn[]
   items: ({ id: string } & T)[]
+  sort?: { key: string; direction: 'asc' | 'desc' } | null
 }>()
 
 const emit = defineEmits<{
@@ -91,6 +92,15 @@ const emit = defineEmits<{
 
 const sortKey = ref<string | null>(null)
 const sortDirection = ref<'asc' | 'desc'>('asc')
+
+watch(
+  () => props.sort,
+  (sort) => {
+    sortKey.value = sort?.key ?? null
+    sortDirection.value = sort?.direction ?? 'asc'
+  },
+  { immediate: true },
+)
 
 function setSortKey(key: string): void {
   if (sortKey.value === key) {
